@@ -1,0 +1,17 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: production
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SOUNDDROP_PORT: "8000"
+      SOUNDDROP_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      SOUNDDROP_FORWARDED_ALLOW_IPS: "127.0.0.1"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

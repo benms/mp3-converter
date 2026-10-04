@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: sounddrop-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: SOUNDDROP_ALLOWED_ORIGINS
+        sync: false
+      - key: SOUNDDROP_FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: SOUNDDROP_MAX_DURATION_SECONDS
+        value: "3600"
+      - key: SOUNDDROP_MAX_SOURCE_MB
+        value: "256"
+      - key: SOUNDDROP_MAX_STORAGE_MB
+        value: "1024"
+      - key: SOUNDDROP_JOB_TIMEOUT_SECONDS
+        value: "1200"
+      - key: SOUNDDROP_FILE_TTL_SECONDS
+        value: "3600"
+      - key: SOUNDDROP_MAX_QUEUE_SIZE
+        value: "10"
+      - key: SOUNDDROP_RATE_LIMIT_PER_HOUR
+        value: "10"
