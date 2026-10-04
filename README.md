@@ -131,9 +131,25 @@ The frontend reads `SOUNDDROP_MAX_DURATION_SECONDS` and `SOUNDDROP_FILE_TTL_SECO
 
 Free instances sleep when idle, and the frontend shows a "connecting" state while the server wakes up. YouTube often restricts downloads from cloud server IPs. Those failures show up as the `upstream_restricted` error.
 
+### Backend on your own machine (Cloudflare quick tunnel)
+
+YouTube usually blocks cloud servers like Render but allows home connections. To serve the live site from your own machine, start the backend together with a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/):
+
+```bash
+docker compose --profile tunnel up -d
+docker compose logs tunnel | grep trycloudflare.com
+```
+
+The second command prints the public `https://…trycloudflare.com` URL. Set it as `VITE_SOUNDDROP_API_URL` in Vercel, then redeploy the frontend. No account, router ports or certificates are needed, and your home IP stays hidden.
+
+- **The URL changes whenever the `tunnel` container restarts**, including after a reboot, so Vercel must then be updated and redeployed. For a permanent URL, use a named tunnel with a Cloudflare account and domain.
+- Conversions only work while your machine and Docker are running.
+- `compose.yaml` already allows `https://mp3-converter-gray.vercel.app`. It trusts forwarded client IPs only from the tunnel container (fixed address `172.28.250.10`), so each visitor keeps their own rate limit.
+- `docker compose up` without the profile runs the backend on `127.0.0.1:8000` only.
+
 ### Frontend on Vercel
 
-Import the repository with **Root Directory** set to `frontend`. `vercel.json` sets the build command, output folder and security headers. Add `VITE_SOUNDDROP_API_URL` with the Render service URL, then redeploy.
+Import the repository with **Root Directory** set to `frontend`. `vercel.json` sets the build command, output folder and security headers. Add `VITE_SOUNDDROP_API_URL` with the backend URL (Render or tunnel) as a **Config** variable, not a Secret: Vercel refuses `VITE_` values stored as secrets because they end up in browser code. Then redeploy.
 
 ## API
 

@@ -7,11 +7,40 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       SOUNDDROP_PORT: "8000"
-      SOUNDDROP_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
-      SOUNDDROP_FORWARDED_ALLOW_IPS: "127.0.0.1"
+      SOUNDDROP_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,https://mp3-converter-gray.vercel.app"
+      # Only the tunnel container may supply the visitor's IP (via X-Forwarded-For).
+      SOUNDDROP_FORWARDED_ALLOW_IPS: "172.28.250.10"
+    networks:
+      default:
+        ipv4_address: 172.28.250.2
     restart: unless-stopped
     stop_grace_period: 15s
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
+  # Public HTTPS URL via a Cloudflare quick tunnel: docker compose --profile tunnel up -d
+  # The *.trycloudflare.com URL changes whenever this container restarts; find it with
+  # docker compose logs tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate --url http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      default:
+        ipv4_address: 172.28.250.10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.250.0/24
