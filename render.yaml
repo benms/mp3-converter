@@ -4,9 +4,14 @@ services:
     runtime: docker
     plan: free
     region: frankfurt
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    # Paths are from the repo root. rootDir is deliberately not used: Render's docs disagree on
+    # whether these paths are resolved against the repo root or rootDir.
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
     healthCheckPath: /api/health
     envVars:
       - key: SOUNDDROP_ALLOWED_ORIGINS
