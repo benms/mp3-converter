@@ -1,11 +1,14 @@
 import asyncio
 import contextlib
+import logging
 import os
+import re
 import signal
 from collections.abc import Callable, Sequence
 
 from app.models import ConversionError
 
+logger = logging.getLogger("sounddrop")
 UNAVAILABLE = (
     "private video",
     "video unavailable",
@@ -26,6 +29,14 @@ RESTRICTED = (
 )
 # RLIMIT_FSIZE makes writes fail with EFBIG ("File too large"); Python ignores SIGXFSZ.
 TOO_LARGE = ("file too large", "larger than max-filesize")
+
+
+def failure_detail(stderr: str) -> str:
+    """The tool's own error line for server logs only, with URL credentials masked."""
+    lines = [x.strip() for x in stderr.splitlines() if x.strip()]
+    errors = [x for x in lines if x.startswith("ERROR:")]
+    detail = (errors or lines or [""])[-1]
+    return re.sub(r"(?<=://)[^/@\s]+@", "***@", detail)[:300]
 
 
 def classify_failure(stderr: str) -> ConversionError:
@@ -97,7 +108,10 @@ async def run_process(
         if guard:
             guard()
         if process.returncode:
-            raise classify_failure(stderr.decode("utf-8", errors="replace"))
+            output = stderr.decode("utf-8", errors="replace")
+            error = classify_failure(output)
+            logger.warning("tool_failed code=%s detail=%s", error.code, failure_detail(output))
+            raise error
         return stdout.decode("utf-8", errors="replace")
     finally:
         # Also terminate descendants if their parent has already exited.

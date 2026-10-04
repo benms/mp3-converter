@@ -9,9 +9,15 @@ from dataclasses import replace
 import pytest
 
 from app.config import Settings
-from app.converter import Converter, check_metadata, encode_mp3, storage_reserve
+from app.converter import (
+    Converter,
+    access_options,
+    check_metadata,
+    encode_mp3,
+    storage_reserve,
+)
 from app.models import ConversionError
-from app.processes import classify_failure, run_process
+from app.processes import classify_failure, failure_detail, run_process
 from app.urls import download_filename, normalize_url
 
 
@@ -123,6 +129,49 @@ def test_failed_subprocess_does_not_expose_stderr():
 )
 def test_failure_classification(stderr, code):
     assert classify_failure(stderr).code == code
+
+
+def test_failure_detail_keeps_the_error_and_masks_credentials():
+    stderr = (
+        "WARNING: something minor\n"
+        "ERROR: Unable to connect to proxy http://user:secret@proxy.example:8080\n"
+    )
+    detail = failure_detail(stderr)
+    assert detail.startswith("ERROR: Unable to connect to proxy")
+    assert "secret" not in detail and "http://***@proxy.example:8080" in detail
+    assert failure_detail("") == ""
+
+
+def test_access_options_use_a_writable_cookie_copy_and_proxy(tmp_path):
+    secret = tmp_path / "secret-cookies.txt"
+    secret.write_text("# Netscape HTTP Cookie File\n")
+    job = tmp_path / "job"
+    job.mkdir()
+    settings = replace(Settings(), cookies_file=secret, proxy="http://u:p@proxy.example:8080")
+    options = access_options(settings, job)
+    assert options == [
+        "--proxy",
+        "http://u:p@proxy.example:8080",
+        "--cookies",
+        str(job / "cookies.txt"),
+    ]
+    assert (job / "cookies.txt").read_text() == secret.read_text()
+    assert access_options(replace(settings, cookies_file=None, proxy=None), job) == []
+    assert "u:p" not in repr(settings)
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("SOUNDDROP_YTDLP_PROXY", "ftp://proxy.example"),
+        ("SOUNDDROP_YTDLP_PROXY", "proxy.example:8080"),
+        ("SOUNDDROP_YTDLP_COOKIES_FILE", "/does/not/exist.txt"),
+    ],
+)
+def test_invalid_access_settings_fail_at_startup(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError, match=name):
+        Settings()
 
 
 def test_storage_reserve_uses_the_actual_video():

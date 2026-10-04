@@ -38,6 +38,11 @@ def create_app(settings: Settings | None = None, converter: Converter | None = N
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logging.basicConfig(level=logging.INFO)
+        logging.getLogger("sounddrop").info(
+            "ytdlp_access cookies=%s proxy=%s",
+            "on" if settings.cookies_file else "off",
+            "on" if settings.proxy else "off",
+        )
         await manager.start()
         yield
         await manager.close()

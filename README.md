@@ -114,6 +114,8 @@ npm test
 | `SOUNDDROP_FILE_TTL_SECONDS` | `3600` | How long finished and failed jobs are kept. |
 | `SOUNDDROP_MAX_QUEUE_SIZE` | `10` | Jobs that can wait in the queue. |
 | `SOUNDDROP_RATE_LIMIT_PER_HOUR` | `10` | Conversions per client IP per hour. |
+| `SOUNDDROP_YTDLP_COOKIES_FILE` | *(unset)* | Optional path to a Netscape-format `cookies.txt` from a YouTube account. Each job gets its own writable copy. The server refuses to start if the file is missing or unreadable. |
+| `SOUNDDROP_YTDLP_PROXY` | *(unset)* | Optional `http(s)://` or `socks5(h)://` proxy URL for yt-dlp. Credentials are masked in logs. |
 
 The frontend reads `SOUNDDROP_MAX_DURATION_SECONDS` and `SOUNDDROP_FILE_TTL_SECONDS` from `/api/health` for its text, so nothing needs changing there.
 
@@ -129,11 +131,20 @@ The frontend reads `SOUNDDROP_MAX_DURATION_SECONDS` and `SOUNDDROP_FILE_TTL_SECO
 
 `render.yaml` defines a free Docker web service (`sounddrop-api`, Frankfurt) built from `backend/Dockerfile`. Its health check uses `/api/health`. Create the service from the blueprint, then set `SOUNDDROP_ALLOWED_ORIGINS` in the dashboard to the frontend's origin, for example `https://sounddrop.vercel.app`.
 
-Free instances sleep when idle, and the frontend shows a "connecting" state while the server wakes up. YouTube often restricts downloads from cloud server IPs. Those failures show up as the `upstream_restricted` error.
+Free instances sleep when idle, and the frontend shows a "connecting" state while the server wakes up.
 
-### Backend on your own machine (Cloudflare quick tunnel)
+#### YouTube blocking on Render
 
-YouTube usually blocks cloud servers like Render but allows home connections. To serve the live site from your own machine, start the backend together with a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/):
+YouTube often refuses downloads from cloud server IPs, including Render's. Users then see the `upstream_restricted` error. The Render log shows YouTube's actual reason in a `tool_failed … detail=ERROR: …` line, for example a "Sign in to confirm you're not a bot" check or an HTTP 403. yt-dlp has two standard ways past this, and the server supports both:
+
+- **Cookies from a YouTube account.** Export a `cookies.txt` (Netscape format) from a browser signed in to YouTube, ideally a separate account in a private window that you then close. In Render, go to **Environment → Secret Files**, add it as `youtube-cookies.txt`, and set `SOUNDDROP_YTDLP_COOKIES_FILE=/etc/secrets/youtube-cookies.txt`. Cookies expire and YouTube rotates them, so you'll need to export them again from time to time.
+- **A proxy.** Set `SOUNDDROP_YTDLP_PROXY`, for example to a residential proxy service URL. Datacenter proxies are usually blocked as well.
+
+Both are against YouTube's terms of service. An account whose cookies are used this way can be flagged or banned, so don't use your main account. When the server starts, the log line `ytdlp_access cookies=on|off proxy=on|off` confirms what is active.
+
+### Alternative: backend on your own machine (Cloudflare quick tunnel)
+
+Home connections are rarely blocked by YouTube. As an alternative to Render, or as a temporary fallback, you can serve the live site from your own machine by starting the backend together with a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/):
 
 ```bash
 docker compose --profile tunnel up -d

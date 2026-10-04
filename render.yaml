@@ -32,3 +32,8 @@ services:
         value: "10"
       - key: SOUNDDROP_RATE_LIMIT_PER_HOUR
         value: "10"
+      # Optional, see README "YouTube blocking on Render".
+      - key: SOUNDDROP_YTDLP_COOKIES_FILE
+        sync: false
+      - key: SOUNDDROP_YTDLP_PROXY
+        sync: false

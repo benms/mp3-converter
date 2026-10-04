@@ -54,6 +54,20 @@ def downloaded_source(directory: Path) -> Path:
     return sources[0]
 
 
+def access_options(settings: Settings, directory: Path) -> list[str]:
+    """yt-dlp options for servers whose IP addresses YouTube restricts."""
+    options = []
+    if settings.proxy:
+        options += ["--proxy", settings.proxy]
+    if settings.cookies_file:
+        # yt-dlp writes the cookie jar back to this file, so each job gets a writable copy.
+        cookies = directory / "cookies.txt"
+        shutil.copyfile(settings.cookies_file, cookies)
+        cookies.chmod(0o600)
+        options += ["--cookies", str(cookies)]
+    return options
+
+
 def check_metadata(info: dict, settings: Settings) -> tuple[str, float]:
     if info.get("is_live") or info.get("live_status") in {"is_live", "is_upcoming", "post_live"}:
         raise ConversionError(
@@ -159,6 +173,7 @@ class Converter:
             "--format",
             # Some videos have no audio-only stream; FFmpeg extracts the audio either way.
             "bestaudio/best",
+            *access_options(settings, directory),
         ]
         update(stage=Stage.INSPECTING, progress=None)
         info = json.loads(await run_process([*base, "--dump-single-json", "--skip-download", url]))

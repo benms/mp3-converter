@@ -38,6 +38,26 @@ def origins() -> list[str]:
     return values
 
 
+def cookies_file() -> Path | None:
+    value = env("YTDLP_COOKIES_FILE", "").strip()
+    if not value:
+        return None
+    path = Path(value)
+    if not path.is_file() or not os.access(path, os.R_OK):
+        raise ValueError(f"{PREFIX}YTDLP_COOKIES_FILE is missing or unreadable: {value}")
+    return path
+
+
+def proxy() -> str | None:
+    value = env("YTDLP_PROXY", "").strip()
+    if not value:
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https", "socks5", "socks5h"} or not parsed.hostname:
+        raise ValueError(f"{PREFIX}YTDLP_PROXY must be an http(s):// or socks5(h):// URL")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     allowed_origins: list[str] = field(default_factory=origins)
@@ -49,3 +69,6 @@ class Settings:
     ttl: int = field(default_factory=lambda: number("FILE_TTL_SECONDS", 3600))
     max_queue: int = field(default_factory=lambda: number("MAX_QUEUE_SIZE", 10))
     hourly_limit: int = field(default_factory=lambda: number("RATE_LIMIT_PER_HOUR", 10))
+    # Optional ways past YouTube's blocking of cloud server IPs (see README).
+    cookies_file: Path | None = field(default_factory=cookies_file)
+    proxy: str | None = field(default_factory=proxy, repr=False)
